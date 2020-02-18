@@ -3,8 +3,6 @@ export CONTEXT_NAME=YOUR_CONTEXT
 export KUBE_NAMESPACE=default
 export ENV_NAME=ENV-1
 
-CDPATH=:..:~:${K8}:${K8}/yamls
-
 stac(){ # Set title and color
     echo -ne "\033]0;$1\007\033]6;1;bg;red;brightness;$2\a\033]6;1;bg;green;brightness;$3\a\033]6;1;bg;blue;brightness;$4\a"
 }
