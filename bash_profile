@@ -11,17 +11,18 @@ alias k="kubectl"
 alias kg="kubectl get"
 alias ke="kubectl edit"
 alias kl="kubectl logs"
-alias kga="kubectl get all"
 alias kd="kubectl describe"
 alias ka="kubectl apply -f"
-alias ks="kubectl scale --replicas "
+alias ks="kubectl scale --replicas"
+alias kga="kubectl get all"
+alias kgp="kubectl get pods -o wide"
+alias kgpw="kubectl get pods -w"
 
 shopt -s cdspell
 
 export BASH_SILENCE_DEPRECATION_WARNING=1
 export COLOREDLOGS_LOG_FORMAT='%(message)s' LSCOLORS=GxFxCxDxbxegedabagaced
 export SVN_EDITOR=vim CLICOLOR=1 LANG=en_US
-
 
 export CONTEXT_NAME=YOUR_CONTEXT
 export KUBE_NAMESPACE=default
@@ -60,25 +61,13 @@ delete_evicted_pods() {
     kubectl -n $KUBE_NAMESPACE get pod | grep Evicted | awk "{print \$1}" | xargs kubectl -n $KUBE_NAMESPACE delete pod
 }
 
-pod() {
-    kubectl config use-context $CONTEXT_NAME 1>/dev/null 2>/dev/null
-    pods=$(kubectl -n $KUBE_NAMESPACE get pod --field-selector=status.phase=Running --selector=app=$1 \
-        -o jsonpath='{.items[*].metadata.name}')
-    if [ "1" -ne $(echo $pods | wc -w) ] && [ -z "$2" ]; then
-        pods_number=$(echo $pods | wc -w | xargs)
-        if [[ $pods_number -ne 0 ]]; then
-            echo "$1 have $(echo $pods | wc -w | xargs) nodes. Use \"pod $1 1\", \"pod $1 2\" commands instead"
-        else
-            echo "No pods for this deployment"
-        fi
-    else
-        [ -z "$2" ] && pod_number=1 || pod_number=$2
-        kubectl -n $KUBE_NAMESPACE exec -it $(echo $pods | awk "{print \$$pod_number}") bash
-    fi
+pod() { # Usage: 'pod deploymentname' (or 'pod deploymentname' 2 if there are > 1 pods)
+    pod=$(kubectl get pod --field-selector=status.phase=Running --selector=app=$1 -o jsonpath='{.items[*].metadata.name}')
+    kubectl exec -it $pod -- bash
 }
 
+
 logs() {
-    kubectl config use-context $CONTEXT_NAME 1>/dev/null 2>/dev/null
     if [ -z "$2" ]; then
         pods=$(kubectl -n $KUBE_NAMESPACE get pod --field-selector=status.phase=Running --selector=app=$1 \
             -o jsonpath='{.items[*].metadata.name}')
@@ -94,20 +83,7 @@ logs() {
     fi
 }
 
-editcm() {
-    kubectl config use-context $CONTEXT_NAME 1>/dev/null 2>/dev/null
-    deploy=$(kubectl -n $KUBE_NAMESPACE get deploy --selector=app=$1 | grep -v ' 0 \|NAME' | awk "{print \$1}")
-    kubectl -n $KUBE_NAMESPACE edit cm $deploy
-}
-
-editdpl() {
-    kubectl config use-context $CONTEXT_NAME 1>/dev/null 2>/dev/null
-    deploy=$(kubectl -n $KUBE_NAMESPACE get deploy --selector=app=$1 | grep -v ' 0 \|NAME' | awk "{print \$1}")
-    kubectl -n $KUBE_NAMESPACE edit deployment $deploy
-}
-
-copyfrompod() { # Usage: copyfrompod component /path/to/file/inside.pod
-    kubectl config use-context $CONTEXT_NAME 1>/dev/null 2>/dev/null
+copyfrompod() { # Usage: copyfrompod deploymentname /path/to/file/inside.pod
     [ -z "$3" ] && pod_number=1 || pod_number=$3
     kubectl -n $KUBE_NAMESPACE exec $(kubectl -n $KUBE_NAMESPACE get pod --field-selector=status.phase=Running \
         --selector=app=$1 -o jsonpath='{.items[*].metadata.name}' | awk "{print \$$pod_number}") -it cat $2 > ${2##*/}
@@ -126,9 +102,8 @@ fuck() {
     history -s $TF_CMD
 }
 
-server(){
+server(){ #start local server in current dir on port 8000
     echo 'http://'$(ifconfig en0 | grep 'inet ' | awk "{print \$2}")':8000'
-    echo 'http://'$(ifconfig en4 | grep 'inet ' | awk "{print \$2}")':8000'
     echo 'http://127.0.0.1:8000'
     python -m SimpleHTTPServer 8000
 }
@@ -157,7 +132,6 @@ hidden_files() { #YES or NO
 
 ip(){
     printf 'WiFi: '; ifconfig en0 | grep 'inet ' | awk "{print \$2}"
-    printf 'LAN:  '; ifconfig en8 | grep 'inet ' | awk "{print \$2}"
 }
 
 tab() {
